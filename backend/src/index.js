@@ -14,11 +14,12 @@ app.use(cors({
     credentials: true
     }
 ))
+
 const PORT = process.env.PORT
 app.use(cookieParser());
 app.use(express.json());
 app.use("/api/auth", authRoutes)
-app.use("/api/message", messageRoutes)
+app.use("/api/messages", messageRoutes)
 app.use("/api/auth", authRoutes);
 
 app.listen(PORT,() => {
