@@ -7,6 +7,22 @@ import MessageSkeleton from "./skeletons/MessageSkeleton";
 import { useAuthStore } from "../store/useAuthStore";
 import { formatMessageTime } from "../lib/utils";
 
+const TypingBubble = ({ avatarSrc }) => (
+  <div className="chat chat-start" data-testid="typing-indicator">
+    <div className="chat-image avatar">
+      <div className="size-10 rounded-full border">
+        <img src={avatarSrc || "/avatar.png"} alt="profile pic" />
+      </div>
+    </div>
+
+    <div className="chat-bubble flex items-center gap-1 py-3 min-h-0">
+      <span className="typing-dot" />
+      <span className="typing-dot" />
+      <span className="typing-dot" />
+    </div>
+  </div>
+);
+
 const ChatContainer = () => {
   const {
     messages,
@@ -15,23 +31,27 @@ const ChatContainer = () => {
     selectedUser,
     subscribeToMessages,
     unsubscribeFromMessages,
+    typingUserId,
   } = useChatStore();
+
   const { authUser } = useAuthStore();
   const messageEndRef = useRef(null);
 
   useEffect(() => {
-    getMessages(selectedUser._id);
+  if (!selectedUser) return;
 
-    subscribeToMessages();
+  getMessages(selectedUser._id);
 
-    return () => unsubscribeFromMessages();
-  }, [selectedUser._id, getMessages, subscribeToMessages, unsubscribeFromMessages]);
+  subscribeToMessages();
+
+  return () => unsubscribeFromMessages();
+}, [selectedUser, getMessages, subscribeToMessages, unsubscribeFromMessages]);
 
   useEffect(() => {
     if (messageEndRef.current && messages) {
       messageEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
-  }, [messages]);
+  }, [messages, typingUserId]);
 
   if (isMessagesLoading) {
     return (
@@ -43,6 +63,9 @@ const ChatContainer = () => {
     );
   }
 
+  const isOtherUserTyping =
+    typingUserId && typingUserId === selectedUser._id;
+
   return (
     <div className="flex-1 flex flex-col overflow-auto">
       <ChatHeader />
@@ -51,10 +74,11 @@ const ChatContainer = () => {
         {messages.map((message) => (
           <div
             key={message._id}
-            className={`chat ${message.senderId === authUser._id ? "chat-end" : "chat-start"}`}
-            ref={messageEndRef}
+            className={`chat ${
+              message.senderId === authUser._id ? "chat-end" : "chat-start"
+            }`}
           >
-            <div className=" chat-image avatar">
+            <div className="chat-image avatar">
               <div className="size-10 rounded-full border">
                 <img
                   src={
@@ -66,11 +90,13 @@ const ChatContainer = () => {
                 />
               </div>
             </div>
+
             <div className="chat-header mb-1">
               <time className="text-xs opacity-50 ml-1">
                 {formatMessageTime(message.createdAt)}
               </time>
             </div>
+
             <div className="chat-bubble flex flex-col">
               {message.image && (
                 <img
@@ -79,14 +105,22 @@ const ChatContainer = () => {
                   className="sm:max-w-[200px] rounded-md mb-2"
                 />
               )}
+
               {message.text && <p>{message.text}</p>}
             </div>
           </div>
         ))}
+
+        {isOtherUserTyping && (
+          <TypingBubble avatarSrc={selectedUser.profilePic} />
+        )}
+
+        <div ref={messageEndRef} />
       </div>
 
       <MessageInput />
     </div>
   );
 };
+
 export default ChatContainer;

@@ -10,13 +10,20 @@ export const useChatStore = create((set, get) => ({
   isUsersLoading: false,
   isMessagesLoading: false,
 
+  // Typing indicator
+  typingUserId: null,
+
+  // AI Smart Replies
+  smartReplies: [],
+  isSmartRepliesLoading: false,
+
   getUsers: async () => {
     set({ isUsersLoading: true });
     try {
       const res = await axiosInstance.get("/messages/users");
       set({ users: res.data });
     } catch (error) {
-      toast.error(error.response.data.message);
+      toast.error(error.response?.data?.message || "Failed to load users");
     } finally {
       set({ isUsersLoading: false });
     }
@@ -28,41 +35,137 @@ export const useChatStore = create((set, get) => ({
       const res = await axiosInstance.get(`/messages/${userId}`);
       set({ messages: res.data });
     } catch (error) {
-      toast.error(error.response.data.message);
+      toast.error(error.response?.data?.message || "Failed to load messages");
     } finally {
       set({ isMessagesLoading: false });
     }
   },
-    sendMessage: async (messageData) => {
-        const { selectedUser, messages } = get();
-        try {
-        const res = await axiosInstance.post(`/messages/send/${selectedUser._id}`, messageData);
-        set({ messages: [...messages, res.data] });
-        } catch (error) {
-        toast.error(error.response.data.message);
-        }
-    },
 
-    subscribeToMessages: () => {
-        const { selectedUser } = get();
-        if (!selectedUser) return;
+  sendMessage: async (messageData) => {
+    const { selectedUser, messages } = get();
 
-        const socket = useAuthStore.getState().socket;
+    try {
+      const res = await axiosInstance.post(
+        `/messages/send/${selectedUser._id}`,
+        messageData
+      );
 
-        socket.on("newMessage", (newMessage) => {
-        const isMessageSentFromSelectedUser = newMessage.senderId === selectedUser._id;
-        if (!isMessageSentFromSelectedUser) return;
+      set({
+        messages: [...messages, res.data],
+        smartReplies: [],
+      });
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to send message");
+    }
+  },
 
-        set({
-            messages: [...get().messages, newMessage],
-        });
-        });
-    },
+  subscribeToMessages: () => {
+    const { selectedUser } = get();
+    if (!selectedUser) return;
 
-    unsubscribeFromMessages: () => {
-        const socket = useAuthStore.getState().socket;
-        socket.off("newMessage");
-    },
+    const socket = useAuthStore.getState().socket;
+    if (!socket) return;
 
-    setSelectedUser: (selectedUser) => set({ selectedUser }),
+    socket.on("newMessage", (newMessage) => {
+      const isMessageSentFromSelectedUser =
+        newMessage.senderId === selectedUser._id;
+
+      if (!isMessageSentFromSelectedUser) return;
+
+      set({
+        messages: [...get().messages, newMessage],
+        smartReplies: [],
+      });
+    });
+
+    socket.on("userTyping", ({ senderId }) => {
+      if (senderId === selectedUser._id) {
+        set({ typingUserId: senderId });
+      }
+    });
+
+    socket.on("userStopTyping", ({ senderId }) => {
+      if (senderId === selectedUser._id) {
+        set({ typingUserId: null });
+      }
+    });
+  },
+
+  unsubscribeFromMessages: () => {
+    const socket = useAuthStore.getState().socket;
+    if (!socket) return;
+
+    socket.off("newMessage");
+    socket.off("userTyping");
+    socket.off("userStopTyping");
+
+    set({
+      typingUserId: null,
+    });
+  },
+
+  emitTyping: () => {
+    const { selectedUser } = get();
+    const socket = useAuthStore.getState().socket;
+
+    if (!socket || !selectedUser) return;
+
+    socket.emit("typing", {
+      receiverId: selectedUser._id,
+    });
+  },
+
+  emitStopTyping: () => {
+    const { selectedUser } = get();
+    const socket = useAuthStore.getState().socket;
+
+    if (!socket || !selectedUser) return;
+
+    socket.emit("stopTyping", {
+      receiverId: selectedUser._id,
+    });
+  },
+
+  fetchSmartReplies: async () => {
+    const { selectedUser } = get();
+
+    if (!selectedUser) return;
+
+    set({
+      isSmartRepliesLoading: true,
+    });
+
+    try {
+      const res = await axiosInstance.get(
+        `/messages/smart-replies/${selectedUser._id}`
+      );
+
+      set({
+        smartReplies: res.data.replies || [],
+      });
+    } catch (error) {
+      toast.error("Couldn't get smart replies");
+
+      set({
+        smartReplies: [],
+      });
+    } finally {
+      set({
+        isSmartRepliesLoading: false,
+      });
+    }
+  },
+
+  clearSmartReplies: () => {
+    set({
+      smartReplies: [],
+    });
+  },
+
+  setSelectedUser: (selectedUser) =>
+    set({
+      selectedUser,
+      typingUserId: null,
+      smartReplies: [],
+    }),
 }));

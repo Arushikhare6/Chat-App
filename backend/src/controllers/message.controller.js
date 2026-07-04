@@ -3,6 +3,7 @@ import Message from "../models/message.model.js";
 
 import cloudinary from "../lib/cloudinary.js";
 import { getReceiverSocketId, io } from "../lib/socket.js";
+import { generateSmartReplies } from "../lib/smartReplies.js";
 
 export const getUsersForSidebar = async (req, res) => {
   try {
@@ -66,5 +67,66 @@ export const sendMessage = async (req, res) => {
   } catch (error) {
     console.log("Error in sendMessage controller: ", error.message);
     res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// -------------------- AI Smart Replies --------------------
+// GET /api/messages/smart-replies/:id
+
+export const getSmartReplies = async (req, res) => {
+  try {
+    const { id: otherUserId } = req.params;
+    const myId = req.user._id;
+
+    const recent = await Message.find({
+      $or: [
+        { senderId: myId, receiverId: otherUserId },
+        { senderId: otherUserId, receiverId: myId },
+      ],
+    })
+      .sort({ createdAt: -1 })
+      .limit(8)
+      .lean();
+
+    if (recent.length === 0) {
+      return res.status(200).json({
+        replies: ["Hey! 👋", "How are you?", "What's up?"],
+        source: "default",
+      });
+    }
+
+    const conversation = recent
+      .reverse()
+      .filter((m) => m.text && m.text.trim().length > 0)
+      .map((m) => ({
+        role: m.senderId.toString() === myId.toString() ? "me" : "them",
+        text: m.text,
+      }));
+
+    if (conversation.length === 0) {
+      return res.status(200).json({
+        replies: ["Nice pic!", "Cool 👀", "Tell me more"],
+        source: "default",
+      });
+    }
+
+    const replies = await generateSmartReplies(conversation);
+
+    return res.status(200).json({
+      replies,
+      source: "ai",
+    });
+  } catch (error) {
+    console.log("Error in getSmartReplies controller: ", error.message);
+
+    return res.status(200).json({
+      replies: [
+        "Got it 👍",
+        "Interesting, tell me more",
+        "Sounds good!",
+      ],
+      source: "fallback",
+      error: error.message,
+    });
   }
 };
