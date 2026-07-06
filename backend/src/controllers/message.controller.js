@@ -163,9 +163,65 @@ export const markMessagesAsRead = async (req, res) => {
     res.status(200).json({
       success: true,
     });
-
   } catch (error) {
     console.log("Error in markMessagesAsRead:", error.message);
+
+    res.status(500).json({
+      error: "Internal server error",
+    });
+  }
+};
+
+// -------------------- Message Reactions --------------------
+
+export const reactToMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { emoji } = req.body;
+    const userId = req.user._id;
+
+    // Find the message
+    const message = await Message.findById(messageId);
+
+    if (!message) {
+      return res.status(404).json({
+        error: "Message not found",
+      });
+    }
+
+    // Check if this user has already reacted
+    const existingReaction = message.reactions.find(
+      (reaction) => reaction.userId.toString() === userId.toString()
+    );
+
+    if (existingReaction) {
+      // Replace previous reaction
+      existingReaction.emoji = emoji;
+    } else {
+      // Add new reaction
+      message.reactions.push({
+        userId,
+        emoji,
+      });
+    }
+
+    await message.save();
+
+    // Notify sender and receiver instantly
+    const senderSocketId = getReceiverSocketId(message.senderId.toString());
+    const receiverSocketId = getReceiverSocketId(message.receiverId.toString());
+
+    if (senderSocketId) {
+      io.to(senderSocketId).emit("messageReaction", message);
+    }
+
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit("messageReaction", message);
+    }
+
+    res.status(200).json(message);
+  } catch (error) {
+    console.log("Error in reactToMessage:", error.message);
 
     res.status(500).json({
       error: "Internal server error",

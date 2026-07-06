@@ -1,6 +1,6 @@
 import { useChatStore } from "../store/useChatStore";
 import { useEffect, useRef } from "react";
-import { Check,CheckCheck } from "lucide-react";
+import { Check,CheckCheck, Smile } from "lucide-react";
 import ChatHeader from "./ChatHeader";
 import MessageInput from "./MessageInput";
 import MessageSkeleton from "./skeletons/MessageSkeleton";
@@ -23,6 +23,7 @@ const TypingBubble = ({ avatarSrc }) => (
   </div>
 );
 
+const REACTIONS = ["❤️", "👍", "😂", "😮", "😢", "🔥"];
 const ChatContainer = () => {
   const {
     messages,
@@ -33,6 +34,7 @@ const ChatContainer = () => {
     unsubscribeFromMessages,
     typingUserId,
     markMessagesAsRead,
+    reactToMessage,
   } = useChatStore();
 
   const { authUser } = useAuthStore();
@@ -116,18 +118,60 @@ const ChatContainer = () => {
                 />
               ))}
           </div>
+          <div className="chat-bubble relative flex flex-col group">
+            {message.image && (
+              <img
+                src={message.image}
+                alt="Attachment"
+                className="sm:max-w-[200px] rounded-md mb-2"
+              />
+            )}
 
-            <div className="chat-bubble flex flex-col">
-              {message.image && (
-                <img
-                  src={message.image}
-                  alt="Attachment"
-                  className="sm:max-w-[200px] rounded-md mb-2"
-                />
-              )}
+            {message.text && <p>{message.text}</p>}
 
-              {message.text && <p>{message.text}</p>}
+            {/* Hover Emoji Picker */}
+            <div
+              className="
+                absolute
+                -bottom-7
+                right-0
+                hidden
+                group-hover:flex
+                gap-1
+                bg-base-200
+                rounded-full
+                px-2
+                py-1
+                shadow-lg
+                z-10
+              "
+            >
+              {REACTIONS.map((emoji) => (
+                <button
+                  key={emoji}
+                  onClick={() => reactToMessage(message._id, emoji)}
+                  className="hover:scale-125 transition"
+                >
+                  {emoji}
+                </button>
+              ))}
             </div>
+
+            {/* Existing reactions */}
+            {message.reactions?.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-2">
+                {message.reactions.map((reaction) => (
+                  <span
+                    key={reaction.userId}
+                    className="text-sm bg-base-300 rounded-full px-2 py-0.5"
+                  >
+                    {reaction.emoji}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+            
           </div>
         ))}
 

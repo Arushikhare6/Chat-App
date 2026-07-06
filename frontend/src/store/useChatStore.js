@@ -58,6 +58,23 @@ export const useChatStore = create((set, get) => ({
       toast.error(error.response?.data?.message || "Failed to send message");
     }
   },
+   
+    reactToMessage: async (messageId, emoji) => {
+  try {
+    const res = await axiosInstance.patch(
+      `/messages/reaction/${messageId}`,
+      { emoji }
+    );
+
+    set({
+      messages: get().messages.map((message) =>
+        message._id === messageId ? res.data : message
+      ),
+    });
+  } catch (error) {
+    toast.error("Couldn't react to message");
+  }
+},
 
     markMessagesAsRead: async () => {
     const { selectedUser, messages } = get();
@@ -129,6 +146,16 @@ export const useChatStore = create((set, get) => ({
         });
       });
 
+    socket.on("messageReaction", (updatedMessage) => {
+      set({
+          messages: get().messages.map((message) =>
+            message._id === updatedMessage._id
+              ? updatedMessage
+              : message
+          ),
+        });
+    });
+
     socket.on("userTyping", ({ senderId }) => {
       if (senderId === selectedUser._id) {
         set({ typingUserId: senderId });
@@ -148,6 +175,7 @@ export const useChatStore = create((set, get) => ({
 
     socket.off("newMessage");
     socket.off("messagesRead");
+    socket.off("messageReaction");
     socket.off("userTyping");
     socket.off("userStopTyping");
 
