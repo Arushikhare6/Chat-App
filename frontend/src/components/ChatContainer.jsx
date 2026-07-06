@@ -1,6 +1,6 @@
 import { useChatStore } from "../store/useChatStore";
 import { useEffect, useRef } from "react";
-
+import { Check,CheckCheck } from "lucide-react";
 import ChatHeader from "./ChatHeader";
 import MessageInput from "./MessageInput";
 import MessageSkeleton from "./skeletons/MessageSkeleton";
@@ -32,10 +32,11 @@ const ChatContainer = () => {
     subscribeToMessages,
     unsubscribeFromMessages,
     typingUserId,
+    markMessagesAsRead,
   } = useChatStore();
 
   const { authUser } = useAuthStore();
-  const messageEndRef = useRef(null);
+  const bottomRef = useRef(null);
 
   useEffect(() => {
   if (!selectedUser) return;
@@ -48,10 +49,16 @@ const ChatContainer = () => {
 }, [selectedUser, getMessages, subscribeToMessages, unsubscribeFromMessages]);
 
   useEffect(() => {
-    if (messageEndRef.current && messages) {
-      messageEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [messages, typingUserId]);
+  bottomRef.current?.scrollIntoView({
+    behavior: "smooth",
+  });
+   }, [messages.length]);
+
+  useEffect(() => {
+  if (!selectedUser) return;
+
+  markMessagesAsRead();
+  }, [selectedUser?._id]);
 
   if (isMessagesLoading) {
     return (
@@ -64,7 +71,7 @@ const ChatContainer = () => {
   }
 
   const isOtherUserTyping =
-    typingUserId && typingUserId === selectedUser._id;
+  selectedUser && typingUserId === selectedUser._id;
 
   return (
     <div className="flex-1 flex flex-col overflow-auto">
@@ -91,11 +98,24 @@ const ChatContainer = () => {
               </div>
             </div>
 
-            <div className="chat-header mb-1">
-              <time className="text-xs opacity-50 ml-1">
-                {formatMessageTime(message.createdAt)}
-              </time>
-            </div>
+            <div className="chat-header mb-1 flex items-center gap-1">
+            <time className="text-xs opacity-50 ml-1">
+              {formatMessageTime(message.createdAt)}
+            </time>
+
+            {message.senderId === authUser._id &&
+              (message.isRead ? (
+                <CheckCheck
+                  size={14}
+                  className="text-sky-500"
+                />
+              ) : (
+                <Check
+                  size={14}
+                  className="text-gray-400"
+                />
+              ))}
+          </div>
 
             <div className="chat-bubble flex flex-col">
               {message.image && (
@@ -112,10 +132,10 @@ const ChatContainer = () => {
         ))}
 
         {isOtherUserTyping && (
-          <TypingBubble avatarSrc={selectedUser.profilePic} />
+          <TypingBubble avatarSrc={selectedUser?.profilePic} />
         )}
 
-        <div ref={messageEndRef} />
+        <div ref={bottomRef} />
       </div>
 
       <MessageInput />

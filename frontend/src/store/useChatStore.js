@@ -59,6 +59,40 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
+    markMessagesAsRead: async () => {
+    const { selectedUser, messages } = get();
+
+    if (!selectedUser) return;
+
+    const unreadMessages = messages.filter(
+    (message) =>
+      message.senderId === selectedUser._id &&
+      !message.isRead
+   );
+
+  if (unreadMessages.length === 0) return;
+
+    try {
+      await axiosInstance.patch(
+        `/messages/read/${selectedUser._id}`
+      );
+
+      set({
+        messages: messages.map((message) =>
+          message.senderId === selectedUser._id
+            ? {
+                ...message,
+                isRead: true,
+                readAt: new Date().toISOString(),
+              }
+            : message
+        ),
+      });
+    } catch (error) {
+      console.error(error);
+    }
+  },
+
   subscribeToMessages: () => {
     const { selectedUser } = get();
     if (!selectedUser) return;
@@ -76,7 +110,24 @@ export const useChatStore = create((set, get) => ({
         messages: [...get().messages, newMessage],
         smartReplies: [],
       });
+      get().markMessagesAsRead();
     });
+
+        socket.on("messagesRead", () => {
+        const { selectedUser } = get();
+
+        set({
+          messages: get().messages.map((message) =>
+            message.receiverId === selectedUser._id
+              ? {
+                  ...message,
+                  isRead: true,
+                  readAt: new Date().toISOString(),
+                }
+              : message
+          ),
+        });
+      });
 
     socket.on("userTyping", ({ senderId }) => {
       if (senderId === selectedUser._id) {
@@ -96,6 +147,7 @@ export const useChatStore = create((set, get) => ({
     if (!socket) return;
 
     socket.off("newMessage");
+    socket.off("messagesRead");
     socket.off("userTyping");
     socket.off("userStopTyping");
 

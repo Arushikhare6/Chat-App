@@ -130,3 +130,45 @@ export const getSmartReplies = async (req, res) => {
     });
   }
 };
+
+export const markMessagesAsRead = async (req, res) => {
+  try {
+    const myId = req.user._id;
+    const { id: otherUserId } = req.params;
+
+    // Mark unread messages as read
+    await Message.updateMany(
+      {
+        senderId: otherUserId,
+        receiverId: myId,
+        isRead: false,
+      },
+      {
+        $set: {
+          isRead: true,
+          readAt: new Date(),
+        },
+      }
+    );
+
+    // Notify sender (if online)
+    const senderSocketId = getReceiverSocketId(otherUserId);
+
+    if (senderSocketId) {
+      io.to(senderSocketId).emit("messagesRead", {
+        readerId: myId,
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+    });
+
+  } catch (error) {
+    console.log("Error in markMessagesAsRead:", error.message);
+
+    res.status(500).json({
+      error: "Internal server error",
+    });
+  }
+};
