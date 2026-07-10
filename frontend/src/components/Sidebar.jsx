@@ -18,6 +18,8 @@ const Sidebar = () => {
     ? users.filter((user) => onlineUsers.includes(user._id))
     : users;
 
+  const formatUnreadCount = (count) => (count > 99 ? "99+" : count);
+
   if (isUsersLoading) return <SidebarSkeleton />;
 
   return (
@@ -65,11 +67,26 @@ const Sidebar = () => {
                   rounded-full ring-2 ring-zinc-900"
                 />
               )}
+              {user.unreadCount > 0 && (
+                <span
+                  className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-primary text-primary-content text-[11px] font-semibold flex items-center justify-center ring-2 ring-base-100"
+                  aria-label={`${user.unreadCount} unread messages`}
+                >
+                  {formatUnreadCount(user.unreadCount)}
+                </span>
+              )}
             </div>
 
             {/* User info - only visible on larger screens */}
-            <div className="hidden lg:block text-left min-w-0">
-              <div className="font-medium truncate">{user.fullName}</div>
+            <div className="hidden lg:block text-left min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-medium truncate">{user.fullName}</span>
+                {user.unreadCount > 0 && (
+                  <span className="badge badge-primary badge-sm shrink-0">
+                    {formatUnreadCount(user.unreadCount)}
+                  </span>
+                )}
+              </div>
               <div className="text-sm text-zinc-400">
                 {onlineUsers.includes(user._id) ? "Online" : "Offline"}
               </div>

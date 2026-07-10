@@ -1,6 +1,6 @@
 import { useChatStore } from "../store/useChatStore";
 import { useEffect, useRef } from "react";
-import { Check,CheckCheck, Smile } from "lucide-react";
+import { Check,CheckCheck, Smile, Reply } from "lucide-react";
 import ChatHeader from "./ChatHeader";
 import MessageInput from "./MessageInput";
 import MessageSkeleton from "./skeletons/MessageSkeleton";
@@ -30,11 +30,10 @@ const ChatContainer = () => {
     getMessages,
     isMessagesLoading,
     selectedUser,
-    subscribeToMessages,
-    unsubscribeFromMessages,
     typingUserId,
     markMessagesAsRead,
     reactToMessage,
+    setReplyingTo,
   } = useChatStore();
 
   const { authUser } = useAuthStore();
@@ -44,11 +43,7 @@ const ChatContainer = () => {
   if (!selectedUser) return;
 
   getMessages(selectedUser._id);
-
-  subscribeToMessages();
-
-  return () => unsubscribeFromMessages();
-}, [selectedUser, getMessages, subscribeToMessages, unsubscribeFromMessages]);
+}, [selectedUser, getMessages]);
 
   useEffect(() => {
   bottomRef.current?.scrollIntoView({
@@ -127,6 +122,17 @@ const ChatContainer = () => {
               />
             )}
 
+            {message.replyTo && (
+            <div className="mb-2 p-2 rounded bg-base-300 border-l-4 border-primary">
+              <p className="text-xs text-primary font-semibold">
+                Replying to
+              </p>
+
+              <p className="text-xs opacity-70 truncate">
+                {message.replyTo.text || "📷 Image"}
+              </p>
+            </div>
+          )}
             {message.text && <p>{message.text}</p>}
 
             {/* Hover Emoji Picker */}
@@ -170,6 +176,14 @@ const ChatContainer = () => {
                 ))}
               </div>
             )}
+              <div className="flex justify-end mt-2">
+            <button
+            onClick={() => setReplyingTo(message)}
+            className="btn btn-ghost btn-xs"
+          >
+            <Reply size={14} />
+          </button>
+          </div>
           </div>
             
           </div>

@@ -16,6 +16,7 @@ export const useChatStore = create((set, get) => ({
   // AI Smart Replies
   smartReplies: [],
   isSmartRepliesLoading: false,
+  replyingTo: null,
 
   getUsers: async () => {
     set({ isUsersLoading: true });
@@ -34,6 +35,10 @@ export const useChatStore = create((set, get) => ({
     try {
       const res = await axiosInstance.get(`/messages/${userId}`);
       set({ messages: res.data });
+
+      if (get().selectedUser?._id === userId) {
+        get().markMessagesAsRead();
+      }
     } catch (error) {
       toast.error(error.response?.data?.message || "Failed to load messages");
     } finally {
@@ -42,17 +47,23 @@ export const useChatStore = create((set, get) => ({
   },
 
   sendMessage: async (messageData) => {
-    const { selectedUser, messages } = get();
+    const { selectedUser, messages, replyingTo } = get();
+
+    if (!selectedUser) return;
 
     try {
       const res = await axiosInstance.post(
         `/messages/send/${selectedUser._id}`,
-        messageData
+        {
+          ...messageData,
+          replyTo: messageData.replyTo || replyingTo?._id || null,
+        }
       );
 
       set({
         messages: [...messages, res.data],
         smartReplies: [],
+        replyingTo: null,
       });
     } catch (error) {
       toast.error(error.response?.data?.message || "Failed to send message");
@@ -95,6 +106,14 @@ export const useChatStore = create((set, get) => ({
       );
 
       set({
+        users: get().users.map((user) =>
+          user._id === selectedUser._id
+            ? {
+                ...user,
+                unreadCount: 0,
+              }
+            : user
+        ),
         messages: messages.map((message) =>
           message.senderId === selectedUser._id
             ? {
@@ -111,17 +130,34 @@ export const useChatStore = create((set, get) => ({
   },
 
   subscribeToMessages: () => {
-    const { selectedUser } = get();
-    if (!selectedUser) return;
-
     const socket = useAuthStore.getState().socket;
     if (!socket) return;
 
-    socket.on("newMessage", (newMessage) => {
-      const isMessageSentFromSelectedUser =
-        newMessage.senderId === selectedUser._id;
+    socket.off("newMessage");
+    socket.off("messagesRead");
+    socket.off("messageReaction");
+    socket.off("userTyping");
+    socket.off("userStopTyping");
 
-      if (!isMessageSentFromSelectedUser) return;
+    socket.on("newMessage", (newMessage) => {
+      const { selectedUser } = get();
+      const isMessageSentFromSelectedUser =
+        selectedUser && newMessage.senderId === selectedUser._id;
+
+      if (!isMessageSentFromSelectedUser) {
+        set({
+          users: get().users.map((user) =>
+            user._id === newMessage.senderId
+              ? {
+                  ...user,
+                  unreadCount: (user.unreadCount || 0) + 1,
+                }
+              : user
+          ),
+        });
+
+        return;
+      }
 
       set({
         messages: [...get().messages, newMessage],
@@ -130,12 +166,13 @@ export const useChatStore = create((set, get) => ({
       get().markMessagesAsRead();
     });
 
-        socket.on("messagesRead", () => {
+        socket.on("messagesRead", ({ readerId }) => {
         const { selectedUser } = get();
+        if (!selectedUser) return;
 
         set({
           messages: get().messages.map((message) =>
-            message.receiverId === selectedUser._id
+            message.receiverId === readerId
               ? {
                   ...message,
                   isRead: true,
@@ -157,13 +194,17 @@ export const useChatStore = create((set, get) => ({
     });
 
     socket.on("userTyping", ({ senderId }) => {
-      if (senderId === selectedUser._id) {
+      const { selectedUser } = get();
+
+      if (senderId === selectedUser?._id) {
         set({ typingUserId: senderId });
       }
     });
 
     socket.on("userStopTyping", ({ senderId }) => {
-      if (senderId === selectedUser._id) {
+      const { selectedUser } = get();
+
+      if (senderId === selectedUser?._id) {
         set({ typingUserId: null });
       }
     });
@@ -242,10 +283,31 @@ export const useChatStore = create((set, get) => ({
     });
   },
 
+  setReplyingTo: (message) => {
+  set({
+    replyingTo: message,
+  });
+},
+
+  clearReplyingTo: () => {
+  set({
+    replyingTo: null,
+  });
+},
+
   setSelectedUser: (selectedUser) =>
     set({
       selectedUser,
       typingUserId: null,
       smartReplies: [],
+      replyingTo: null,
+      users: get().users.map((user) =>
+        user._id === selectedUser?._id
+          ? {
+              ...user,
+              unreadCount: 0,
+            }
+          : user
+      ),
     }),
 }));

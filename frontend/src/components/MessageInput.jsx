@@ -19,6 +19,8 @@ const MessageInput = () => {
   fetchSmartReplies,
   clearSmartReplies,
   selectedUser,
+  replyingTo,
+  clearReplyingTo,
 } = useChatStore();
 
   useEffect(() => {
@@ -102,6 +104,7 @@ const MessageInput = () => {
       await sendMessage({
         text: text.trim(),
         image: imagePreview,
+        replyTo: replyingTo?._id || null,
       });
 
       // Clear form
@@ -138,6 +141,31 @@ const MessageInput = () => {
 
   return (
     <div className="p-4 w-full">
+      {replyingTo && (
+    <div className="mb-3 rounded-lg border-l-4 border-primary bg-base-200 p-3">
+      <div className="flex items-center justify-between">
+
+        <div className="overflow-hidden">
+          <p className="text-xs font-semibold text-primary">
+            Replying to
+          </p>
+
+          <p className="text-sm truncate">
+            {replyingTo.text || "📷 Image"}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={clearReplyingTo}
+          className="btn btn-xs btn-circle"
+        >
+          <X size={14} />
+        </button>
+
+      </div>
+    </div>
+  )}
       {imagePreview && (
         <div className="mb-3 flex items-center gap-2">
           <div className="relative">

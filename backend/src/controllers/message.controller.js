@@ -8,9 +8,35 @@ import { generateSmartReplies } from "../lib/smartReplies.js";
 export const getUsersForSidebar = async (req, res) => {
   try {
     const loggedInUserId = req.user._id;
-    const filteredUsers = await User.find({ _id: { $ne: loggedInUserId } }).select("-password");
+    const filteredUsers = await User.find({ _id: { $ne: loggedInUserId } })
+      .select("-password")
+      .lean();
 
-    res.status(200).json(filteredUsers);
+    const unreadCounts = await Message.aggregate([
+      {
+        $match: {
+          receiverId: loggedInUserId,
+          isRead: { $ne: true },
+        },
+      },
+      {
+        $group: {
+          _id: "$senderId",
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const unreadCountByUserId = new Map(
+      unreadCounts.map((item) => [item._id.toString(), item.count])
+    );
+
+    const usersWithUnreadCounts = filteredUsers.map((user) => ({
+      ...user,
+      unreadCount: unreadCountByUserId.get(user._id.toString()) || 0,
+    }));
+
+    res.status(200).json(usersWithUnreadCounts);
   } catch (error) {
     console.error("Error in getUsersForSidebar: ", error.message);
     res.status(500).json({ error: "Internal server error" });
@@ -27,7 +53,8 @@ export const getMessages = async (req, res) => {
         { senderId: myId, receiverId: userToChatId },
         { senderId: userToChatId, receiverId: myId },
       ],
-    });
+    }).populate("replyTo")
+    .sort({ createdAt: 1 });
 
     res.status(200).json(messages);
   } catch (error) {
@@ -38,7 +65,7 @@ export const getMessages = async (req, res) => {
 
 export const sendMessage = async (req, res) => {
   try {
-    const { text, image } = req.body;
+    const { text, image, replyTo } = req.body;
     const { id: receiverId } = req.params;
     const senderId = req.user._id;
 
@@ -54,9 +81,11 @@ export const sendMessage = async (req, res) => {
       receiverId,
       text,
       image: imageUrl,
+      replyTo: replyTo || null,
     });
 
     await newMessage.save();
+    await newMessage.populate("replyTo");
 
     const receiverSocketId = getReceiverSocketId(receiverId);
     if (receiverSocketId) {
@@ -141,7 +170,7 @@ export const markMessagesAsRead = async (req, res) => {
       {
         senderId: otherUserId,
         receiverId: myId,
-        isRead: false,
+        isRead: { $ne: true },
       },
       {
         $set: {
