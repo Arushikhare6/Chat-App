@@ -61,7 +61,9 @@ export const useChatStore = create((set, get) => ({
       );
 
       set({
-        messages: [...messages, res.data],
+        messages: messages.some((message) => message._id === res.data._id)
+          ? messages
+          : [...messages, res.data],
         smartReplies: [],
         replyingTo: null,
       });
@@ -156,6 +158,10 @@ export const useChatStore = create((set, get) => ({
           ),
         });
 
+        return;
+      }
+
+      if (get().messages.some((message) => message._id === newMessage._id)) {
         return;
       }
 

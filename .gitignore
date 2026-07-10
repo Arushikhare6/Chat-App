@@ -27,3 +27,4 @@ dist-ssr
 
 # Ignore the backend seed file containing database passwords
 backend/src/seeds/user.seed.js
+.agents

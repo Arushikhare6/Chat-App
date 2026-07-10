@@ -18,6 +18,23 @@ const messageSchema = new mongoose.Schema(
     image: {
       type: String,
     },
+    file: {
+      url: {
+        type: String,
+      },
+      name: {
+        type: String,
+      },
+      type: {
+        type: String,
+      },
+      size: {
+        type: Number,
+      },
+      resourceType: {
+        type: String,
+      },
+    },
     replyTo: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Message",
